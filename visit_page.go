@@ -82,37 +82,17 @@ func visitHomePage(
 
 // initChromedpOptions sets up the allocator options with anti-detection flags and user data.
 func initChromedpOptions(profileName string, headless bool, userAgent string) []chromedp.ExecAllocatorOption {
-	profilePath := filepath.Join("./profiles/", profileName)
+	profilePath := filepath.Join(".", "profiles", profileName)
+	fmt.Println("profilePath---------, ", profilePath)
 
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.NoFirstRun,
-		chromedp.NoDefaultBrowserCheck,
-		// Anti-detection flags
-		chromedp.Flag("disable-blink-features", "AutomationControlled"),
-		chromedp.Flag("enable-automation", false),
-		chromedp.Flag("disable-extensions", false), // Kept this as false
-
-		chromedp.Flag("disable-infobars", true),
-		chromedp.Flag("disable-gpu", true),
-		chromedp.Flag("allow-running-insecure-content", true),
-		chromedp.Flag("disable-notifications", true),
-		chromedp.Flag("disable-translate", true),
-		chromedp.Flag("password-store", "basic"),
-		chromedp.Flag("credentials_enable_service", false),
-		chromedp.Flag("disable-default-apps", true),
-		chromedp.Flag("disable-dev-shm-usage", true),
-
-		// User data settings
-		chromedp.UserAgent(userAgent),
+	opts := append(
+		chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.UserDataDir(profilePath),
-		chromedp.Flag("profile-directory", profileName),
+		chromedp.Flag("headless", false),
+		chromedp.Flag("no-first-run", true),
+		chromedp.Flag("no-default-browser-check", true),
+		chromedp.Flag("disable-extensions", false),
+		chromedp.Flag("disable-blink-features", "AutomationControlled"),
 	)
-
-	if !headless {
-		opts = append(opts, chromedp.Flag("headless", false))
-	} else {
-		// Use the new headless mode
-		opts = append(opts, chromedp.Headless)
-	}
 	return opts
 }

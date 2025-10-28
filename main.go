@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath" // Required for profile path handling
+	"os" // Required for profile path handling
+	"path/filepath"
 	"time"
 
 	"github.com/chromedp/cdproto/emulation" // <--- ADDED EMULATION IMPORT
@@ -82,9 +82,10 @@ func simulateLogin(
 		// Navigate to login page
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			log.Printf("Navigating to %s", loginURL)
-			return network.SetExtraHTTPHeaders(network.Headers{
-				"Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7", // Adjusting Accept-Language based on vi-VN locale
-			}).Do(ctx)
+			return nil
+			// return network.SetExtraHTTPHeaders(network.Headers{
+			// 	"Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7", // Adjusting Accept-Language based on vi-VN locale
+			// }).Do(ctx)
 		}),
 		chromedp.Navigate(loginURL),
 
@@ -174,7 +175,7 @@ func simulateLogin(
 
 			// Keep browser open for a bit
 			log.Println("Login and state saving complete. Closing browser in 5 seconds...")
-			time.Sleep(5 * time.Second)
+			time.Sleep(500 * time.Second)
 			return nil
 		}),
 	)
@@ -194,28 +195,28 @@ func simulateLogin(
 
 func main() {
 	// Dummy variables for demonstration (replace with actual configuration)
-	loginURL := PARTNER_TIKTOKSHOP_LOGIN_URL
+	// loginURL := PARTNER_TIKTOKSHOP_LOGIN_URL
 	ttoHomepage := PARTNER_TIKSHOP_HOME_URL
-	username := "van.le@brancherx.com" // Placeholder
-	password := "VLantking2013!"       // Placeholder
-	statePath := "tiktokshop_state_go.json"
+	// username := "van.le@brancherx.com" // Placeholder
+	// password := "VLantking2013!"       // Placeholder
+	// statePath := "tiktokshop_state_go.json"
 	userAgent := DEFAULT_USER_AGENT
 
-	err := simulateLogin(
-		loginURL,
-		username,
-		password,
-		statePath,
-		userAgent,
-		"tto",
-		false, // headless
-		"",    // proxy
-	)
+	// err := simulateLogin(
+	// 	loginURL,
+	// 	username,
+	// 	password,
+	// 	statePath,
+	// 	userAgent,
+	// 	"tto",
+	// 	false, // headless
+	// 	"",    // proxy
+	// )
 
-	if err != nil {
-		log.Fatalf("Login and state saving failed: %v", err)
-		return
-	}
+	// if err != nil {
+	// 	log.Fatalf("Login and state saving failed: %v", err)
+	// 	return
+	// }
 
 	if err := visitHomePage(
 		ttoHomepage,
@@ -232,7 +233,7 @@ func main() {
 
 func initOPTTTS(profileName string, headless bool, userAgent string) []chromedp.ExecAllocatorOption {
 	// --- 1. Set up Chromedp Context and Options ---
-	profilePath := filepath.Join("./profiles/", profileName)
+	profilePath := filepath.Join("./profiles", profileName)
 
 	// Define browser options (based on BROWSER_ARGS from the Python script for realism)
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
