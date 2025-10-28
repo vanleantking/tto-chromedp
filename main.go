@@ -20,7 +20,7 @@ const (
 	// Placeholder for the login page and expected dashboard URL
 	// Updated URLs based on the user's local environment testing
 	PARTNER_TIKTOKSHOP_LOGIN_URL = "https://ads.tiktok.com/i18n/login?redirect=https%3A%2F%2Fads.tiktok.com%2Fcreative%2Flogin%3Fredirect%3Dhttps%253A%252F%252Fads.tiktok.com%252Fcreative%252Fcreator%252Fexplore%253Fregion%253Drow&_source_=tiktok-one" // Replace with actual login URL
-	PARTNER_TIKSHOP_HOME_URL     = "https://ads.tiktok.com/creative/creator/explore?region=row&from_creative=login"                                                                                                                                         // Replace with actual home URL
+	PARTNER_TIKSHOP_HOME_URL     = "https://ads.tiktok.com/creative/creator/explore?region=row"                                                                                                                                                             // Replace with actual home URL
 
 	EMAIL_SELECTOR    = `input[placeholder="Enter your email address"]`
 	PASSWORD_SELECTOR = `input[placeholder="Enter your password"]`
@@ -194,32 +194,9 @@ func simulateLogin(
 
 func main() {
 	// Dummy variables for demonstration (replace with actual configuration)
-	loginURL := PARTNER_TIKTOKSHOP_LOGIN_URL
-	ttoHomepage := PARTNER_TIKSHOP_HOME_URL
-	username := "van.le@brancherx.com" // Placeholder
-	password := "VLantking2013!"       // Placeholder
-	statePath := "tiktokshop_state_go.json"
-	userAgent := DEFAULT_USER_AGENT
-
-	err := simulateLogin(
-		loginURL,
-		username,
-		password,
-		statePath,
-		userAgent,
-		"tto",
-		false, // headless
-		"",    // proxy
-	)
-
-	if err != nil {
-		log.Fatalf("Login and state saving failed: %v", err)
-		return
-	}
-
+	//loginURL := PARTNER_TIKTOKSHOP_LOGIN_URL
 	if err := visitHomePage(
-		ttoHomepage,
-		userAgent,
+		PARTNER_TIKSHOP_HOME_URL,
 		"tto",
 		false, // headless
 		"",    // proxy
