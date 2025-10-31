@@ -50,11 +50,8 @@ type TTOCreatorResponse struct {
 		StatusMessage string `json:"StatusMessage"`
 	} `json:"baseResp"`
 	Creators []struct {
-		AioCreatorID  string `json:"aioCreatorID"`
-		ContentLabels []struct {
-			LabelID   string `json:"labelID"`
-			LabelName string `json:"labelName"`
-		} `json:"contentLabels"`
+		AioCreatorID   string         `json:"aioCreatorID"`
+		ContentLabels  []ContentLabel `json:"contentLabels"`
 		CreatorProfile struct {
 			Price struct {
 			} `json:"price"`
@@ -119,26 +116,10 @@ type TTOCreatorResponse struct {
 			LabelID   string `json:"labelID"`
 			LabelName string `json:"labelName"`
 		} `json:"industryLabels"`
-		IsCarveOut  bool `json:"isCarveOut"`
-		PriceIndex  int  `json:"priceIndex"`
-		RecentItems []struct {
-			Comment      int    `json:"comment"`
-			CoverURL     string `json:"coverURL"`
-			CoverURLList []struct {
-				Format   string `json:"format"`
-				ImageURL string `json:"imageUrl"`
-			} `json:"coverURLList"`
-			CreateTime       string `json:"createTime"`
-			Heart            int    `json:"heart"`
-			IsBoosted        bool   `json:"isBoosted"`
-			IsSponsoredVideo bool   `json:"isSponsoredVideo"`
-			ItemID           string `json:"itemID"`
-			Share            int    `json:"share"`
-			Title            string `json:"title"`
-			VideoURL         string `json:"videoURL"`
-			Views            string `json:"views"`
-		} `json:"recentItems"`
-		RiskInfo struct {
+		IsCarveOut  bool        `json:"isCarveOut"`
+		PriceIndex  int         `json:"priceIndex"`
+		RecentItems []VideoItem `json:"recentItems"`
+		RiskInfo    struct {
 			CreatorID string `json:"creatorID"`
 		} `json:"riskInfo"`
 		StatisticData struct {
@@ -146,10 +127,7 @@ type TTOCreatorResponse struct {
 				ContentLanguage []string `json:"contentLanguage"`
 			} `json:"algo"`
 			FollowerCountHistory struct {
-				FollowerCount []struct {
-					Count int    `json:"count"`
-					Date  string `json:"date"`
-				} `json:"followerCount"`
+				FollowerCount      []FollowerTrend `json:"followerCount"`
 				FollowerGrowthRate []struct {
 					Date string  `json:"date"`
 					Rate float64 `json:"rate"`
@@ -160,22 +138,13 @@ type TTOCreatorResponse struct {
 					Active string  `json:"active"`
 					Ratio  float64 `json:"ratio"`
 				} `json:"active"`
-				Age []struct {
-					AgeInterval string  `json:"ageInterval"`
-					Ratio       float64 `json:"ratio"`
-				} `json:"age"`
+				Age         []AgeDistri `json:"age"`
 				DeviceBrand []struct {
 					DeviceBrand string  `json:"deviceBrand"`
 					Ratio       float64 `json:"ratio"`
 				} `json:"deviceBrand"`
-				Gender []struct {
-					Gender string  `json:"gender"`
-					Ratio  float64 `json:"ratio"`
-				} `json:"gender"`
-				Region []struct {
-					Country string  `json:"country"`
-					Ratio   float64 `json:"ratio"`
-				} `json:"region"`
+				Gender []GenderDistri `json:"gender"`
+				Region []RegionDistri `json:"region"`
 			} `json:"followerDistriData"`
 			OverallPerformance struct {
 				AvgSixSecondsViewsBenchMarkViews float64 `json:"avgSixSecondsViewsBenchMarkViews"`
@@ -215,27 +184,63 @@ type TTOCreatorResponse struct {
 					VideoURL         string `json:"videoURL"`
 					Views            string `json:"views"`
 				} `json:"popularVideos"`
-				RecentVideos []struct {
-					Comment      int    `json:"comment"`
-					CoverURL     string `json:"coverURL"`
-					CoverURLList []struct {
-						Format   string `json:"format"`
-						ImageURL string `json:"imageUrl"`
-					} `json:"coverURLList"`
-					CreateTime       string `json:"createTime"`
-					Heart            int    `json:"heart"`
-					IsBoosted        bool   `json:"isBoosted"`
-					IsSponsoredVideo bool   `json:"isSponsoredVideo"`
-					ItemID           string `json:"itemID"`
-					Share            int    `json:"share"`
-					Title            string `json:"title"`
-					VideoURL         string `json:"videoURL"`
-					Views            string `json:"views"`
-				} `json:"recentVideos"`
+				RecentVideos []VideoItem `json:"recentVideos"`
 			} `json:"videoPerformance"`
 		} `json:"statisticData"`
 		TtUID string `json:"ttUID"`
 	} `json:"creators"`
+}
+
+type TTOUser struct {
+	CategoryContent []ContentLabel  `json:"category_content"`
+	AgeDistri       []AgeDistri     `json:"age_distri"`
+	RegionDistri    []RegionDistri  `json:"region_distri"`
+	GenderDistri    []GenderDistri  `json:"gender_distri"`
+	FollowerTrend   []FollowerTrend `json:"follower_trend"`
+	VideoViews      []VideoItem     `json:"video_views"`
+}
+
+type AgeDistri struct {
+	AgeInterval string  `json:"ageInterval"`
+	Ratio       float64 `json:"ratio"`
+}
+
+type GenderDistri struct {
+	Gender string  `json:"gender"`
+	Ratio  float64 `json:"ratio"`
+}
+
+type RegionDistri struct {
+	Country string  `json:"country"`
+	Ratio   float64 `json:"ratio"`
+}
+
+type FollowerTrend struct {
+	Count int    `json:"count"`
+	Date  string `json:"date"`
+}
+
+type ContentLabel struct {
+	LabelID   string `json:"labelID"`
+	LabelName string `json:"labelName"`
+}
+
+type VideoItem struct {
+	Comment      int    `json:"comment"`
+	CoverURL     string `json:"coverURL"`
+	CoverURLList []struct {
+		Format   string `json:"format"`
+		ImageURL string `json:"imageUrl"`
+	} `json:"coverURLList"`
+	CreateTime       string `json:"createTime"`
+	Heart            int    `json:"heart"`
+	IsBoosted        bool   `json:"isBoosted"`
+	IsSponsoredVideo bool   `json:"isSponsoredVideo"`
+	ItemID           string `json:"itemID"`
+	Share            int    `json:"share"`
+	Title            string `json:"title"`
+	VideoURL         string `json:"videoURL"`
+	Views            string `json:"views"`
 }
 
 // CollectedData holds the information captured from a matching network response.
@@ -256,8 +261,6 @@ func processSingleKol(
 
 	// Slice to hold network data collected by the listener
 	var collectedData []CollectedData
-	var isEmailLocatorPresent bool // Variable to store the result of the locator check
-	var isResultExists bool
 
 	// Create a new context with a timeout for the KOL processing
 	kolCtx, cancel := context.WithTimeout(ctx, 180*time.Second)
@@ -269,46 +272,16 @@ func processSingleKol(
 		chromedp.WaitVisible(NAME_SEARCH_ELEM, chromedp.BySearch),
 		chromedp.Click(NAME_SEARCH_ELEM, chromedp.BySearch),
 		chromedp.Sleep(5*time.Second),
-		// --- START: LOCATOR EXISTENCE CHECK ---
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			// Check if the element exists in the DOM using JavaScript:
-			// document.querySelector(selector) returns the element or null. Checking if it's not null gives a boolean.
-			js := fmt.Sprintf("document.querySelector('%s') !== null", SEARCH_BUTTON_ELEM)
-
-			// Execute the JavaScript and store the boolean result
-			err := chromedp.Evaluate(js, &isEmailLocatorPresent).Do(ctx)
-			if err != nil {
-				// Log the error but continue, assuming the element is not present if the evaluation fails
-				log.Printf("Error during locator existence check: %v", err)
-				isEmailLocatorPresent = false
-			}
-			// Print the result as requested by the user
-			log.Printf("Check for locator '%s': Exists = %t, %s, %s", SEARCH_BUTTON_ELEM, isEmailLocatorPresent)
-			return nil
-		}),
-		// --- END: LOCATOR EXISTENCE CHECK ---
-
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			log.Println("Waiting for search input to be visible...")
-			return nil
-		}),
 		chromedp.WaitVisible(INPUT_SEARCH_ELEM, chromedp.ByQuery),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			log.Printf("Search input visible. Setting value to '%s'...", kolName)
-			return nil
-		}),
+		chromedp.Click(INPUT_SEARCH_ELEM, chromedp.BySearch),
+		chromedp.Sleep(2*time.Second),
+		// Use Clear to reliably empty the input field, avoiding stale element issues.
+		chromedp.Clear(INPUT_SEARCH_ELEM, chromedp.ByQuery),
+		chromedp.Sleep(2*time.Second),
 		// Use SendKeys for reliability with JS frameworks. It simulates user typing.
 		chromedp.SendKeys(INPUT_SEARCH_ELEM, kolName, chromedp.ByQuery),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			log.Println("Value set. Waiting before clicking search...")
-			return nil
-		}),
 		chromedp.Sleep(2*time.Second), // A short pause can help ensure the UI has processed the input.
 		chromedp.Click(SEARCH_BUTTON_ELEM, chromedp.ByQuery),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			log.Println("Search button clicked. Waiting for results to load...")
-			return nil
-		}),
 		chromedp.Sleep(15*time.Second),
 
 		// Wait for search results table body
@@ -325,38 +298,9 @@ func processSingleKol(
 
 	// Get content and creator name from the first result card
 	err = chromedp.Run(kolCtx,
-
-		// --- END: LOCATOR EXISTENCE CHECK ---
+		// Get the full HTML content of the first result card
 		chromedp.WaitVisible(fmt.Sprintf("%s", SEARCH_RESULTS_BODY), chromedp.ByQuery),
-		// chromedp.WaitVisible(fmt.Sprintf("%s %s %s %s", SEARCH_RESULTS_BODY, FIRST_ROW_DATA_INDEX, GRID_ELEM, SECTION_LOCATOR), chromedp.ByQuery),
-		// --- START: LOCATOR EXISTENCE CHECK ---
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			// Check if the element exists in the DOM using JavaScript:
-			// document.querySelector(selector) returns the element or null. Checking if it's not null gives a boolean.
-			js := fmt.Sprintf("document.querySelector('%s') !== null", SEARCH_RESULTS_BODY)
-
-			// Execute the JavaScript and store the boolean result
-			err := chromedp.Evaluate(js, &isResultExists).Do(ctx)
-			if err != nil {
-				// Log the error but continue, assuming the element is not present if the evaluation fails
-				log.Printf("Error during locator existence check: %v", err)
-				isEmailLocatorPresent = false
-			}
-			// Print the result as requested by the user
-			log.Printf("Check for locator '%s': Exists = %t, %s, %s", SEARCH_RESULTS_BODY, isResultExists)
-			return nil
-		}),
-		// Scroll down to ensure the element is in the viewport (Playwright's window.scrollTo)
-		// chromedp.Evaluate(`window.scrollTo(0, 500)`, nil),
 		chromedp.Sleep(1*time.Second),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			log.Println("getting the text result...")
-			return nil
-		}),
-
-		// Get the inner text of the entire first card for 'No results' check
-		// chromedp.Text(fmt.Sprintf("%s div %s %s %s", SEARCH_RESULTS_BODY, FIRST_ROW_DATA_INDEX, GRID_ELEM, SECTION_LOCATOR), &firstCardContent, chromedp.ByQuery),
-
 		// Get the specific creator name element text
 		chromedp.Text(fmt.Sprintf("%s div div %s", SECTION_LOCATOR, CREATOR_NAME_ELEM), &creatorNameText, chromedp.ByQuery),
 	)
@@ -432,7 +376,7 @@ func processSingleKol(
 					log.Printf("Error getting response body for %s: %v", ev.Response.URL, err)
 					return
 				}
-				fmt.Println("body response from url------------, ", string(body), resp.URL)
+				fmt.Println("body response from url------------, ", resp.URL)
 
 				var ttoResp TTOCreatorResponse
 				if err := json.Unmarshal(body, &ttoResp); err != nil {
@@ -452,6 +396,13 @@ func processSingleKol(
 		// Wait for the page content to fully load
 		chromedp.WaitVisible("body", chromedp.ByQuery),
 		chromedp.Sleep(5*time.Second), // Wait for async data load (Playwright's 100000ms equivalent, but reduced)
+		// Refresh the page as requested
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			log.Println("Refreshing the page...")
+			return nil
+		}),
+		chromedp.Reload(),
+		chromedp.Sleep(5*time.Second), // Wait again after refresh
 	); err != nil {
 		return kolName, nil, fmt.Errorf("failed to load/process new tab: %w", err)
 	}
@@ -470,13 +421,13 @@ func processSingleKol(
 
 // crawlerKols implements the main looping and state loading logic.
 func crawlerKols(
-	kolList []KolData,
+	kol KolData,
 	urlPattern string,
 	statePath string,
 	userAgent string,
 	profileName string,
 	headless bool,
-) (map[string][]CollectedData, error) {
+) ([]CollectedData, error) {
 
 	// 1. Initial Setup: Allocator Context (Browser Instance)
 	opts := initChromedpOptions(profileName, headless, userAgent)
@@ -511,34 +462,30 @@ func crawlerKols(
 	log.Println("Successfully navigated to the protected page.")
 
 	// 5. Crawling Loop
-	var finalCreators = make(map[string][]CollectedData)
 
-	for _, kol := range kolList {
-		log.Printf("\nProcessing KOL: ID=%s, Username=%s", kol.ID, kol.Username)
+	log.Printf("\nProcessing KOL: ID=%s, Username=%s", kol.ID, kol.Username)
 
-		// FIX: Pass the main tab's context (mainTaskCtx) to perform actions on the page.
-		finalKolName, collectedData, err := processSingleKol(mainTaskCtx, kol.Username, urlPattern)
+	// FIX: Pass the main tab's context (mainTaskCtx) to perform actions on the page.
+	finalKolName, collectedData, err := processSingleKol(mainTaskCtx, kol.Username, urlPattern)
 
-		if err != nil {
-			log.Printf("Error processing KOL %s: %v", finalKolName, err)
-			continue
-		}
+	if err != nil {
+		log.Printf("Error processing KOL %s: %v", finalKolName, err)
+		return nil, err
+	}
 
-		log.Printf("Processed %s. Captured %d data points.", finalKolName, len(collectedData))
+	log.Printf("Processed %s. Captured %d data points.", finalKolName, len(collectedData))
 
-		// NOTE: Placeholder for your Python's self._parse_user_data logic.
-		// You would typically process 'collectedData' here to create a final structure.
-		// For now, we'll just track the successful names.
-		if len(collectedData) > 0 {
-			finalCreators[kol.Username] = collectedData
-			log.Printf("Data captured for KOL %s.", kol.Username, len(collectedData))
-		}
+	// NOTE: Placeholder for your Python's self._parse_user_data logic.
+	// You would typically process 'collectedData' here to create a final structure.
+	// For now, we'll just track the successful names.
+	if len(collectedData) > 0 {
+		log.Printf("Data captured for KOL %s.", kol.Username, len(collectedData))
 	}
 
 	// Final 5-second pause and browser close is handled by the defer cancelAlloc()
 	log.Println("Finished processing all KOLs. Browser will close.")
 
-	return finalCreators, nil
+	return collectedData, nil
 }
 
 func main() {
@@ -546,6 +493,7 @@ func main() {
 	// NOTE: This array of KOLs replaces the Python input list
 	kolsToCrawl := []KolData{
 		{ID: "1001", Username: "fayemabini"},
+		{ID: "1005", Username: "daipimenta"},
 	}
 
 	// loginURL := PARTNER_TIKTOKSHOP_LOGIN_URL
@@ -559,19 +507,20 @@ func main() {
 	// 2. Start the main crawling loop using the saved state.
 	log.Println("\n--- Starting KOL Crawling Process ---")
 
-	crawledData, err := crawlerKols(kolsToCrawl, urlPattern, statePath, userAgent, profileName, false)
+	for _, kol := range kolsToCrawl {
 
-	if err != nil {
-		log.Fatalf("Fatal: Crawler failed: %v", err)
-	}
+		crawledData, err := crawlerKols(kol, urlPattern, statePath, userAgent, profileName, false)
 
-	for kolName, collectedData := range crawledData {
-		log.Printf("Successfully crawled creator: ID=%s, Username=%s", kolName, len(collectedData))
+		if err != nil {
+			log.Fatalf("Fatal: Crawler failed: %v", err)
+			continue
+		}
+		log.Printf("Successfully crawled creator: ID=%s, Username=%s", kol.Username, len(crawledData))
+		userInfo, isFull := parseUserData(crawledData)
+		fmt.Println("------------user info parser, ", *userInfo, isFull)
 	}
 
 	log.Printf("\n--- Final Summary ---")
-	log.Printf("Total KOLs processed: %d", len(kolsToCrawl))
-	log.Printf("Total creators successfully crawled (data captured): %d", len(crawledData))
 
 	log.Println("Chromedp script finished successfully.")
 }
@@ -591,4 +540,77 @@ func initChromedpOptions(profileName string, headless bool, userAgent string) []
 		chromedp.Flag("disable-blink-features", "AutomationControlled"),
 	)
 	return opts
+}
+
+func parseUserData(collectedData []CollectedData) (*TTOUser, bool) {
+	var categoryContent []ContentLabel
+	var ageDistri []AgeDistri
+	var regionDistri []RegionDistri
+	var genderDistri []GenderDistri
+	var followerTrend []FollowerTrend
+	var videoViews []VideoItem
+
+	var isFull = false
+
+	for _, data := range collectedData {
+		if data.Body != nil {
+			dataResp := *data.Body
+			// if not exist creator data, continue
+			if len(dataResp.Creators) == 0 {
+				continue
+			}
+			creatorData := dataResp.Creators[0]
+			// Collect category labels
+			if len(creatorData.ContentLabels) > 0 || creatorData.ContentLabels != nil {
+				categoryContent = creatorData.ContentLabels
+			}
+			// Collect demographic distributions
+			if len(creatorData.StatisticData.FollowerDistriData.Age) > 0 ||
+				creatorData.StatisticData.FollowerDistriData.Age != nil {
+				ageDistri = creatorData.StatisticData.FollowerDistriData.Age
+			}
+
+			// Collect region and gender distributions
+			if len(creatorData.StatisticData.FollowerDistriData.Region) > 0 ||
+				creatorData.StatisticData.FollowerDistriData.Region != nil {
+				regionDistri = creatorData.StatisticData.FollowerDistriData.Region
+			}
+			if len(creatorData.StatisticData.FollowerDistriData.Gender) > 0 ||
+				creatorData.StatisticData.FollowerDistriData.Gender != nil {
+				genderDistri = creatorData.StatisticData.FollowerDistriData.Gender
+			}
+			// Collect follower trends
+			if len(creatorData.StatisticData.FollowerCountHistory.FollowerCount) > 0 ||
+				creatorData.StatisticData.FollowerCountHistory.FollowerCount != nil {
+				followerTrend = creatorData.StatisticData.FollowerCountHistory.FollowerCount
+			}
+			// Collect video views
+			if len(creatorData.StatisticData.VideoPerformance.RecentVideos) > 0 ||
+				creatorData.StatisticData.VideoPerformance.RecentVideos != nil {
+				videoViews = creatorData.StatisticData.VideoPerformance.RecentVideos
+			}
+
+			// If all data is collected, break
+			if len(categoryContent) > 0 &&
+				len(ageDistri) > 0 &&
+				len(regionDistri) > 0 &&
+				len(genderDistri) > 0 &&
+				len(followerTrend) > 0 &&
+				len(videoViews) > 0 {
+				isFull = true
+				break
+			}
+		}
+	}
+	if isFull {
+		return &TTOUser{
+			CategoryContent: categoryContent,
+			AgeDistri:       ageDistri,
+			RegionDistri:    regionDistri,
+			GenderDistri:    genderDistri,
+			FollowerTrend:   followerTrend,
+			VideoViews:      videoViews,
+		}, true
+	}
+	return nil, false
 }
