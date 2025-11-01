@@ -5,16 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"tto_chromedp/pkg/models"
+	"tto_chromedp/pkg/mongodb"
+	"tto_chromedp/pkg/postgre"
+	"tto_chromedp/pkg/utils"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
+	"github.com/joho/godotenv"
 )
 
 // Constants and Configuration based on user's request and best practices.
@@ -192,12 +200,11 @@ type TTOCreatorResponse struct {
 }
 
 type TTOUser struct {
-	CategoryContent []ContentLabel  `json:"category_content"`
-	AgeDistri       []AgeDistri     `json:"age_distri"`
-	RegionDistri    []RegionDistri  `json:"region_distri"`
-	GenderDistri    []GenderDistri  `json:"gender_distri"`
-	FollowerTrend   []FollowerTrend `json:"follower_trend"`
-	VideoViews      []VideoItem     `json:"video_views"`
+	CategoryContent []map[string]interface{}    `json:"content_interest"`
+	AgeDistri       []map[string]interface{}    `json:"audience_age"`
+	RegionDistri    []map[string]interface{}    `json:"audience_location"`
+	GenderDistri    []map[string]interface{}    `json:"audience_gender"`
+	KolGrowth       map[string][]map[string]int `json:"kol_growth"`
 }
 
 type AgeDistri struct {
@@ -421,7 +428,7 @@ func processSingleKol(
 
 // crawlerKols implements the main looping and state loading logic.
 func crawlerKols(
-	kol KolData,
+	kol models.SocialProfile,
 	urlPattern string,
 	statePath string,
 	userAgent string,
@@ -463,10 +470,10 @@ func crawlerKols(
 
 	// 5. Crawling Loop
 
-	log.Printf("\nProcessing KOL: ID=%s, Username=%s", kol.ID, kol.Username)
+	log.Printf("\nProcessing KOL: ID=%s, Username=%s", kol.ID, kol.UserName)
 
 	// FIX: Pass the main tab's context (mainTaskCtx) to perform actions on the page.
-	finalKolName, collectedData, err := processSingleKol(mainTaskCtx, kol.Username, urlPattern)
+	finalKolName, collectedData, err := processSingleKol(mainTaskCtx, kol.UserName, urlPattern)
 
 	if err != nil {
 		log.Printf("Error processing KOL %s: %v", finalKolName, err)
@@ -479,7 +486,7 @@ func crawlerKols(
 	// You would typically process 'collectedData' here to create a final structure.
 	// For now, we'll just track the successful names.
 	if len(collectedData) > 0 {
-		log.Printf("Data captured for KOL %s.", kol.Username, len(collectedData))
+		log.Printf("Data captured for KOL %s.", kol.UserName, len(collectedData))
 	}
 
 	// Final 5-second pause and browser close is handled by the defer cancelAlloc()
@@ -489,12 +496,47 @@ func crawlerKols(
 }
 
 func main() {
-	// --- Input Configuration ---
-	// NOTE: This array of KOLs replaces the Python input list
-	kolsToCrawl := []KolData{
-		{ID: "1001", Username: "fayemabini"},
-		{ID: "1005", Username: "daipimenta"},
+
+	// --- Load Environment Variables ---
+	if err := godotenv.Load(); err != nil {
+		log.Printf("Warning: Could not load .env file: %v", err)
 	}
+
+	// 1. Configuration parameters
+	reportMongoDB, err := mongodb.ConnectMongoDB(os.Getenv("MONGODB_URI"))
+	if err != nil {
+		log.Fatalf("Failed to connect to MongoDB: %v", err, os.Getenv("MONGODB_URI"))
+	}
+	defer reportMongoDB.Disconnect(context.Background())
+
+	creds := postgre.DBCredentials{
+		Host:     os.Getenv("POSTGRES_HOST"),
+		Port:     os.Getenv("POSTGRES_PORT"),
+		User:     os.Getenv("POSTGRES_USER"),
+		Password: os.Getenv("POSTGRES_PASS"),
+		DBName:   os.Getenv("POSTGRES_DATABASE"),
+		SSLMode:  os.Getenv("POSTGRES_SSLMODE"), // e.g., "disable", "require", "verify-full"
+	}
+
+	postgreDB, err := postgre.InitDB(creds)
+	if err != nil {
+		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
+	}
+	defer postgreDB.Close()
+
+	countryRepository := mongodb.NewCountryDetailRepository(reportMongoDB, os.Getenv("MONGODB_COUNTRY_DETAIL_COLLECTION"))
+	countryIsoCode, err := countryRepository.GetCountryCodes(context.Background())
+	if err != nil {
+		log.Fatalf("Failed to get country codes from MongoDB: %v", err)
+	}
+
+	socialProfileRepo := postgre.NewSocialProfileRepository(postgreDB)
+	kolsToCrawl, err := socialProfileRepo.GetSocialProfileCrawlTTO()
+	if err != nil {
+		log.Fatalf("Failed to get KOLs to crawl from PostgreSQL: %v", err)
+	}
+
+	fmt.Println(countryIsoCode, kolsToCrawl)
 
 	// loginURL := PARTNER_TIKTOKSHOP_LOGIN_URL
 	// username := "van.le@brancherx.com" // Placeholder
@@ -515,8 +557,14 @@ func main() {
 			log.Fatalf("Fatal: Crawler failed: %v", err)
 			continue
 		}
-		log.Printf("Successfully crawled creator: ID=%s, Username=%s", kol.Username, len(crawledData))
-		userInfo, isFull := parseUserData(crawledData)
+		log.Printf("Successfully crawled creator: ID=%s, Username=%s", kol.UserName, len(crawledData))
+		userInfo, isFull := parseUserData(crawledData, countryIsoCode)
+		if isFull {
+			log.Printf("Full data collected for KOL %s.", kol.UserName)
+			log.Printf("User Info: %+v", *userInfo)
+			break
+
+		}
 		fmt.Println("------------user info parser, ", *userInfo, isFull)
 	}
 
@@ -542,7 +590,7 @@ func initChromedpOptions(profileName string, headless bool, userAgent string) []
 	return opts
 }
 
-func parseUserData(collectedData []CollectedData) (*TTOUser, bool) {
+func parseUserData(collectedData []CollectedData, countryIsoCode map[string]string) (*TTOUser, bool) {
 	var categoryContent []ContentLabel
 	var ageDistri []AgeDistri
 	var regionDistri []RegionDistri
@@ -603,14 +651,190 @@ func parseUserData(collectedData []CollectedData) (*TTOUser, bool) {
 		}
 	}
 	if isFull {
+		category := convertCategoryDistriToPercent(categoryContent)
+		age := convertAgeDistriToPercent(ageDistri)
+		gender := convertGenderDistriToPercent(genderDistri)
+		region := convertRegionDistriToPercent(regionDistri, countryIsoCode)
+		follower := convertFollowerDistriToPercent(followerTrend)
+		videoViews := convertVideoViewsDistriToPercent(videoViews)
+
+		kolGrowth := mergeKOLGrowthData(follower, videoViews)
 		return &TTOUser{
-			CategoryContent: categoryContent,
-			AgeDistri:       ageDistri,
-			RegionDistri:    regionDistri,
-			GenderDistri:    genderDistri,
-			FollowerTrend:   followerTrend,
-			VideoViews:      videoViews,
+			CategoryContent: category,
+			AgeDistri:       age,
+			RegionDistri:    region,
+			GenderDistri:    gender,
+			KolGrowth:       kolGrowth,
 		}, true
 	}
 	return nil, false
+}
+
+func convertAgeDistriToPercent(ageDistri []AgeDistri) []map[string]interface{} {
+	// Initialize the destination slice
+	result := make([]map[string]interface{}, 0, len(ageDistri))
+
+	// Iterate over the input slice
+	for _, item := range ageDistri {
+		// Create a new map for each struct element
+		m := make(map[string]interface{})
+
+		// Manually map struct fields to map keys.
+		// We typically use the JSON tag names (e.g., "ageInterval", "ratio") as map keys.
+		m["name"] = item.AgeInterval
+		m["value"] = item.Ratio
+
+		// Append the map to the result slice
+		result = append(result, m)
+	}
+
+	return result
+}
+
+func convertGenderDistriToPercent(genderDistri []GenderDistri) []map[string]interface{} {
+	// Initialize the destination slice
+	result := make([]map[string]interface{}, 0, len(genderDistri))
+
+	// Iterate over the input slice
+	for _, item := range genderDistri {
+		// Create a new map for each struct element
+		m := make(map[string]interface{})
+
+		// Manually map struct fields to map keys.
+		// We typically use the JSON tag names (e.g., "ageInterval", "ratio") as map keys.
+		m["name"] = strings.ToLower(item.Gender)
+		m["value"] = item.Ratio
+
+		// Append the map to the result slice
+		result = append(result, m)
+	}
+
+	return result
+}
+
+func convertCategoryDistriToPercent(contentLabels []ContentLabel) []map[string]interface{} {
+	// Initialize the destination slice
+	result := make([]map[string]interface{}, 0, len(contentLabels))
+
+	avgPercent := 1.0 / float64(len(contentLabels))
+	totalPercent := 0.0
+
+	// Iterate over the input slice
+	for idx, item := range contentLabels {
+		// Create a new map for each struct element
+		m := make(map[string]interface{})
+
+		// Manually map struct fields to map keys.
+		// We typically use the JSON tag names (e.g., "ageInterval", "ratio") as map keys.
+		m["id"] = item.LabelID
+		m["name"] = item.LabelName
+		totalPercent += avgPercent
+		// Adjust the last item's percent to ensure total sums to 1.0
+		if idx == len(contentLabels)-1 {
+			avgPercent += 1.0 - totalPercent
+		}
+		m["value"] = avgPercent
+
+		// Append the map to the result slice
+		result = append(result, m)
+	}
+
+	return result
+}
+
+func convertRegionDistriToPercent(regionDistri []RegionDistri, countryIsoCode map[string]string) []map[string]interface{} {
+	// Initialize the destination slice
+	result := make([]map[string]interface{}, 0, len(regionDistri))
+
+	// Iterate over the input slice
+	for _, item := range regionDistri {
+		// Create a new map for each struct element
+		m := make(map[string]interface{})
+
+		// Manually map struct fields to map keys.
+		// We typically use the JSON tag names (e.g., "ageInterval", "ratio") as map keys.
+		m["name"] = countryIsoCode[item.Country]
+		m["iso_code"] = item.Country
+		m["value"] = item.Ratio
+
+		// Append the map to the result slice
+		result = append(result, m)
+	}
+
+	return result
+}
+
+func convertFollowerDistriToPercent(followerTrend []FollowerTrend) map[int64]int {
+	// Initialize the destination slice
+	result := make(map[int64]int)
+
+	// Iterate over the input slice
+	for _, item := range followerTrend {
+
+		// Manually map struct fields to map keys.
+		// We typically use the JSON tag names (e.g., "ageInterval", "ratio") as map keys.
+
+		createdDate, parseErr := utils.FormatDatetime(item.Date)
+		if parseErr == nil {
+			createdDate = 0
+		}
+		result[createdDate] = item.Count
+	}
+
+	return result
+}
+
+func convertVideoViewsDistriToPercent(videoViews []VideoItem) map[int64]int {
+	// Initialize the destination slice
+	result := make(map[int64]int)
+
+	// Iterate over the input slice
+	for _, item := range videoViews {
+		// Manually map struct fields to map keys.
+		// We typically use the JSON tag names (e.g., "ageInterval", "ratio") as map keys.
+		createdTime, err := strconv.Atoi(item.CreateTime)
+		if err != nil {
+			createdTime = 0
+		}
+
+		truncate, err := utils.TruncateToDate(int64(createdTime))
+		if err != nil {
+			truncate = 0
+		}
+
+		videoViews, err := strconv.Atoi(item.Views)
+		if err != nil {
+			videoViews = 0
+		}
+
+		result[truncate] = videoViews
+	}
+
+	return result
+}
+
+func mergeKOLGrowthData(followerTrend, videoViews map[int64]int) map[string][]map[string]int {
+	var mergeData = make(map[int64]map[string]int)
+	for k, v := range followerTrend {
+		mergeData[k] = map[string]int{"followers": v}
+	}
+	for k, v := range videoViews {
+		if _, exists := mergeData[k]; exists {
+			mergeData[k]["videos"] = v
+			continue
+		} else {
+			mergeData[k] = map[string]int{"videos": v}
+		}
+	}
+	var result = make([]map[string]int, 0, len(mergeData))
+
+	for k, v := range mergeData {
+		m := make(map[string]int)
+		m["time"] = int(k)
+		m["followers"] = v["followers"]
+		m["videos"] = v["video_views"]
+		result = append(result, m)
+	}
+
+	return map[string][]map[string]int{"detail": result}
 }
