@@ -9,12 +9,14 @@ import (
 	"strings"
 	"time"
 	"tto_chromedp/pkg/models"
+
+	"github.com/lib/pq"
 )
 
 type SocialProfileRepository interface {
 	UpsertContentInterestsAndGetIDs(contentInterests []string, userID int) (map[string]int, error)
 	UpsertBrandsAndGetIDs(brandNames []string, userID int, clientID int) (map[string]int, error)
-	UpdateTTOUser(userID int, identityData map[string]interface{}) error
+	UpdateTTOUser(ctx context.Context, userID int, identityData map[string]interface{}) error
 	GetSocialProfileCrawlTTO() ([]models.SocialProfile, error)
 	Close() error
 }
@@ -81,11 +83,11 @@ func (sp *socialProfileRepository) UpsertContentInterestsAndGetIDs(contentIntere
 
 	contentMap := make(map[string]int)
 
-	// Use PostgreSQL's ANY() clause with the contentInterests slice (passed as $1)
-	// The lib/pq driver automatically handles passing a Go slice as a PostgreSQL array.
+	// Use PostgreSQL's ANY() clause. The Go string slice must be wrapped in pq.Array()
+	// for the driver to correctly convert it to a PostgreSQL array.
 	selectQuery := "SELECT id, name FROM cms.content_interest WHERE name = ANY($1);"
 
-	rows, err := tx.Query(selectQuery, contentInterests)
+	rows, err := tx.Query(selectQuery, pq.Array(contentInterests))
 	if err != nil {
 		return nil, fmt.Errorf("select IDs query failed: %w", err)
 	}
@@ -165,7 +167,7 @@ func (sp *socialProfileRepository) UpsertBrandsAndGetIDs(brandNames []string, us
 
 	selectQuery := "SELECT id, title FROM cms.brands WHERE title = ANY($1);"
 
-	rows, err := tx.Query(selectQuery, brandNames)
+	rows, err := tx.Query(selectQuery, pq.Array(brandNames))
 	if err != nil {
 		return nil, fmt.Errorf("select brand IDs query failed: %w", err)
 	}
@@ -193,14 +195,14 @@ func (sp *socialProfileRepository) UpsertBrandsAndGetIDs(brandNames []string, us
 }
 
 // UpdateTTSUser updates the social_profiles table with the processed identity data for a user.
-func (sp *socialProfileRepository) UpdateTTOUser(userID int, identityData map[string]interface{}) error {
+func (sp *socialProfileRepository) UpdateTTOUser(ctx context.Context, userID int, identityData map[string]interface{}) error {
 	// Map identity_data keys to database column names
 	dbMapping := map[string]string{
 		"content_interest":          "content_interest",
-		"audience_age":              "content_interest",
-		"audience_location":         "content_interest",
-		"audience_gender":           "content_interest",
-		"kol_growth":                "content_interest",
+		"audience_age":              "audience_age",
+		"audience_location":         "audience_location",
+		"audience_gender":           "audience_gender",
+		"kol_growth":                "kol_growth",
 		"tiktokshop_updated_at":     "tiktokshop_updated_at",
 		"tiktokshop_creator_status": "tiktokshop_creator_status",
 	}
@@ -292,8 +294,8 @@ func (sp *socialProfileRepository) UpdateTTOUser(userID int, identityData map[st
 }
 
 func (sp *socialProfileRepository) GetSocialProfileCrawlTTO() ([]models.SocialProfile, error) {
-	sqlQuery := `SELECT id, username FROM crawler.social_profiles WHERE tiktokshop_creator_status = $1 LIMIT $2;`
-	rows, err := sp.db.QueryContext(context.Background(), sqlQuery, -1, 200)
+	sqlQuery := `SELECT id, username FROM crawler.social_profiles WHERE tiktokshop_creator_status = $1 and id=$2 LIMIT $3;`
+	rows, err := sp.db.QueryContext(context.Background(), sqlQuery, -1, 187, 200)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query social profiles: %w", err)
 	}

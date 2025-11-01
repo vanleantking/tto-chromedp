@@ -5,8 +5,7 @@ import (
 	"time"
 )
 
-func FormatDatetime(input string) (int64, error) {
-	dateString := "20250801"
+func FormatDatetime(dateString string) (int64, error) {
 	// Go's reference time: Mon Jan 2 15:04:05 MST 2006
 	// For YYYYMMDD (20250801), the layout is 20060102
 	layout := "20060102"

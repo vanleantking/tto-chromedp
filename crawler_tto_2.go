@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -291,8 +292,8 @@ func processSingleKol(
 		chromedp.Click(SEARCH_BUTTON_ELEM, chromedp.ByQuery),
 		chromedp.Sleep(15*time.Second),
 
-		// Wait for search results table body
-		chromedp.WaitVisible(SEARCH_RESULTS_BODY, chromedp.ByQuery),
+		// // Wait for search results table body
+		// chromedp.WaitVisible(SEARCH_RESULTS_BODY, chromedp.ByQuery),
 	)
 	if err != nil {
 		return kolName, nil, fmt.Errorf("search failed: %w", err)
@@ -554,18 +555,38 @@ func main() {
 		crawledData, err := crawlerKols(kol, urlPattern, statePath, userAgent, profileName, false)
 
 		if err != nil {
-			log.Fatalf("Fatal: Crawler failed: %v", err)
+			log.Println("Fatal: Crawler failed: %v", err)
 			continue
 		}
 		log.Printf("Successfully crawled creator: ID=%s, Username=%s", kol.UserName, len(crawledData))
-		userInfo, isFull := parseUserData(crawledData, countryIsoCode)
+		userInfo, isFull := parseUserData(crawledData, countryIsoCode, socialProfileRepo)
 		if isFull {
 			log.Printf("Full data collected for KOL %s.", kol.UserName)
 			log.Printf("User Info: %+v", *userInfo)
+
+			// Convert TTOUser struct to map[string]interface{} to match the repository method signature.
+			// This is a common pattern using JSON marshaling/unmarshaling.
+			var dataToUpdate map[string]interface{}
+			jsonData, err := json.Marshal(userInfo)
+			if err != nil {
+				log.Printf("Error marshaling user info to JSON for KOL ID %d: %v", kol.ID, err)
+				continue
+			}
+			if err := json.Unmarshal(jsonData, &dataToUpdate); err != nil {
+				log.Printf("Error unmarshaling user info to map for KOL ID %d: %v", kol.ID, err)
+				continue
+			}
+
+			fmt.Println("dataToUpdate------------, ", dataToUpdate)
+			dataToUpdate["tiktokshop_updated_at"] = time.Now()
+			dataToUpdate["tiktokshop_creator_status"] = 1
+
+			// Update the database with the collected data
+			err = socialProfileRepo.UpdateTTOUser(context.Background(), kol.ID, dataToUpdate)
+
 			break
 
 		}
-		fmt.Println("------------user info parser, ", *userInfo, isFull)
 	}
 
 	log.Printf("\n--- Final Summary ---")
@@ -590,7 +611,7 @@ func initChromedpOptions(profileName string, headless bool, userAgent string) []
 	return opts
 }
 
-func parseUserData(collectedData []CollectedData, countryIsoCode map[string]string) (*TTOUser, bool) {
+func parseUserData(collectedData []CollectedData, countryIsoCode map[string]string, socialProfileRepo postgre.SocialProfileRepository) (*TTOUser, bool) {
 	var categoryContent []ContentLabel
 	var ageDistri []AgeDistri
 	var regionDistri []RegionDistri
@@ -651,7 +672,7 @@ func parseUserData(collectedData []CollectedData, countryIsoCode map[string]stri
 		}
 	}
 	if isFull {
-		category := convertCategoryDistriToPercent(categoryContent)
+		category := convertCategoryDistriToPercent(categoryContent, socialProfileRepo)
 		age := convertAgeDistriToPercent(ageDistri)
 		gender := convertGenderDistriToPercent(genderDistri)
 		region := convertRegionDistriToPercent(regionDistri, countryIsoCode)
@@ -712,12 +733,22 @@ func convertGenderDistriToPercent(genderDistri []GenderDistri) []map[string]inte
 	return result
 }
 
-func convertCategoryDistriToPercent(contentLabels []ContentLabel) []map[string]interface{} {
+func convertCategoryDistriToPercent(contentLabels []ContentLabel, socialProfileRepo postgre.SocialProfileRepository) []map[string]interface{} {
 	// Initialize the destination slice
 	result := make([]map[string]interface{}, 0, len(contentLabels))
 
 	avgPercent := 1.0 / float64(len(contentLabels))
 	totalPercent := 0.0
+
+	var contentName []string
+	for _, label := range contentLabels {
+		contentName = append(contentName, label.LabelName)
+	}
+	categoryMapping, err := socialProfileRepo.UpsertContentInterestsAndGetIDs(contentName, 1)
+	if err != nil {
+		log.Printf("Error fetching category mapping: %v", err)
+		return result
+	}
 
 	// Iterate over the input slice
 	for idx, item := range contentLabels {
@@ -726,14 +757,15 @@ func convertCategoryDistriToPercent(contentLabels []ContentLabel) []map[string]i
 
 		// Manually map struct fields to map keys.
 		// We typically use the JSON tag names (e.g., "ageInterval", "ratio") as map keys.
-		m["id"] = item.LabelID
+		m["id"] = categoryMapping[item.LabelName]
 		m["name"] = item.LabelName
+		m["label_id"] = item.LabelID
 		totalPercent += avgPercent
 		// Adjust the last item's percent to ensure total sums to 1.0
 		if idx == len(contentLabels)-1 {
 			avgPercent += 1.0 - totalPercent
 		}
-		m["value"] = avgPercent
+		m["percent"] = avgPercent
 
 		// Append the map to the result slice
 		result = append(result, m)
@@ -770,12 +802,8 @@ func convertFollowerDistriToPercent(followerTrend []FollowerTrend) map[int64]int
 
 	// Iterate over the input slice
 	for _, item := range followerTrend {
-
-		// Manually map struct fields to map keys.
-		// We typically use the JSON tag names (e.g., "ageInterval", "ratio") as map keys.
-
 		createdDate, parseErr := utils.FormatDatetime(item.Date)
-		if parseErr == nil {
+		if parseErr != nil {
 			createdDate = 0
 		}
 		result[createdDate] = item.Count
@@ -831,10 +859,15 @@ func mergeKOLGrowthData(followerTrend, videoViews map[int64]int) map[string][]ma
 	for k, v := range mergeData {
 		m := make(map[string]int)
 		m["time"] = int(k)
-		m["followers"] = v["followers"]
-		m["videos"] = v["video_views"]
+		m["followers"] = v["followers"] // v["followers"] will be 0 if not present, which is fine.
+		m["videos"] = v["videos"]       // Corrected from "video_views"
 		result = append(result, m)
 	}
+
+	// Sort the result slice by the 'time' field in ascending order.
+	sort.Slice(result, func(i, j int) bool {
+		return result[i]["time"] < result[j]["time"]
+	})
 
 	return map[string][]map[string]int{"detail": result}
 }
