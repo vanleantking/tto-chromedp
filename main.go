@@ -273,3 +273,86 @@ func initOPTTTS(profileName string, headless bool, userAgent string) []chromedp.
 
 	return tmp
 }
+
+// Constants and Configuration based on user's request and best practices.
+// visitHomePage logs into the platform and saves the session state (cookies).
+func visitHomePage(
+	loginURL string,
+	userAgent string,
+	profileName string, // Added profileName to function signature
+	headless bool,
+	proxy string, // Note: Proxy configuration is more complex in chromedp and often requires external tools or specific transport settings.
+) error {
+	opts := initChromedpOptions(profileName, headless, userAgent)
+
+	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancel()
+
+	// Create browser context with a timeout for the entire login process
+	taskCtx, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
+	defer cancel()
+
+	// Apply context settings for realism (locale, timezone, viewport)
+	// These are typically set using the Emulation domain in CDP.
+	if err := chromedp.Run(taskCtx,
+		// 5. Set a common desktop viewport size
+		chromedp.EmulateViewport(1920, 1080),
+		// 6. Set locale/timezone for extra realism
+		emulation.SetTimezoneOverride("Asia/Ho_Chi_Minh"), // <-- FIXED
+		emulation.SetLocaleOverride(),                     // <-- FIXED
+	); err != nil {
+		return fmt.Errorf("failed to set emulation settings: %w", err)
+	}
+
+	// Create a new context with a separate timeout for navigation and interaction tasks
+	interactionCtx, cancelInteraction := context.WithTimeout(taskCtx, 600*time.Second) // 120 second total timeout
+	defer cancelInteraction()
+
+	// --- 2. Define Chromedp Tasks (Login Flow) ---
+
+	var currentURL string // Variable to store the current URL for verification
+
+	err := chromedp.Run(interactionCtx,
+		// Navigate to login page
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			log.Printf("Navigating to %s", loginURL)
+			return network.SetExtraHTTPHeaders(network.Headers{
+				"Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7", // Adjusting Accept-Language based on vi-VN locale
+			}).Do(ctx)
+		}),
+		chromedp.Navigate(loginURL),
+
+		// **IMPROVED WAIT:** Wait for the body and initial page load to ensure stability
+		// chromedp.WaitReady("body", chromedp.ByQuery),
+		chromedp.Sleep(600*time.Second),
+	)
+
+	if err != nil {
+		// Log the last known URL on error
+		if currentURL != "" {
+			log.Printf("An error occurred. Last known URL: %s", currentURL)
+		} else {
+			log.Printf("An error occurred: %s", err.Error())
+		}
+		return err
+	}
+
+	return nil
+}
+
+// initChromedpOptions sets up the allocator options with anti-detection flags and user data.
+func initChromedpOptions(profileName string, headless bool, userAgent string) []chromedp.ExecAllocatorOption {
+	profilePath := filepath.Join(".", "profiles", profileName)
+	fmt.Println("profilePath---------, ", profilePath)
+
+	opts := append(
+		chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.UserDataDir(profilePath),
+		chromedp.Flag("headless", false),
+		chromedp.Flag("no-first-run", true),
+		chromedp.Flag("no-default-browser-check", true),
+		chromedp.Flag("disable-extensions", false),
+		chromedp.Flag("disable-blink-features", "AutomationControlled"),
+	)
+	return opts
+}
