@@ -349,9 +349,9 @@ func initChromedpOptions(profileName string, headless bool, userAgent string) []
 		chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.UserDataDir(profilePath),
 		chromedp.Flag("headless", false),
-		chromedp.Flag("no-first-run", true),
-		chromedp.Flag("no-default-browser-check", true),
-		chromedp.Flag("disable-extensions", false),
+		// chromedp.Flag("no-first-run", true),
+		// chromedp.Flag("no-default-browser-check", true),
+		// chromedp.Flag("disable-extensions", false),
 		chromedp.Flag("disable-blink-features", "AutomationControlled"),
 	)
 	return opts
