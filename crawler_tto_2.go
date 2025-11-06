@@ -604,7 +604,7 @@ func main() {
 
 // initChromedpOptions sets up the allocator options with anti-detection flags and user data.
 func initChromedpOptions(profileName string, headless bool, userAgent string) []chromedp.ExecAllocatorOption {
-	profilePath := filepath.Join(".", "profiles", profileName)
+	profilePath := filepath.Join("./profiles", profileName)
 	fmt.Println("profilePath---------, ", profilePath)
 
 	opts := append(
