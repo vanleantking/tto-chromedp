@@ -557,7 +557,7 @@ func main() {
 		if err != nil {
 			log.Println("Fatal: Crawler failed: %v", err)
 			log.Printf("Incomplete data collected for KOL %s.", kol.UserName)
-			err = socialProfileRepo.UpdateTTOUser(context.Background(), kol.ID, map[string]interface{}{
+			err = socialProfileRepo.UpdateTTOUser2(context.Background(), kol.ID, map[string]interface{}{
 				"tiktokshop_updated_at":     time.Now(),
 				"tiktokshop_creator_status": -2,
 			})
@@ -590,7 +590,7 @@ func main() {
 			dataToUpdate["tiktokshop_creator_status"] = 1
 
 			// Update the database with the collected data
-			err = socialProfileRepo.UpdateTTOUser(context.Background(), kol.ID, dataToUpdate)
+			err = socialProfileRepo.UpdateTTOUser2(context.Background(), kol.ID, dataToUpdate)
 			if err != nil {
 				log.Printf("Error updating TTO user for KOL ID %d: %v", kol.ID, err)
 			}

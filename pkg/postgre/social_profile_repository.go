@@ -16,7 +16,7 @@ import (
 type SocialProfileRepository interface {
 	UpsertContentInterestsAndGetIDs(contentInterests []string, userID int) (map[string]int, error)
 	UpsertBrandsAndGetIDs(brandNames []string, userID int, clientID int) (map[string]int, error)
-	UpdateTTOUser(ctx context.Context, userID int, identityData map[string]interface{}) error
+	UpdateTTOUser2(ctx context.Context, userID int, identityData map[string]interface{}) error
 	GetSocialProfileCrawlTTO() ([]models.SocialProfile, error)
 	Close() error
 }
@@ -291,6 +291,100 @@ func (sp *socialProfileRepository) UpdateTTOUser(ctx context.Context, userID int
 	}
 
 	return nil
+}
+
+// UpdateTTOUser updates the social_profiles table with the processed identity data for a user.
+func (sp *socialProfileRepository) UpdateTTOUser2(ctx context.Context, userID int, identityData map[string]interface{}) error {
+	
+    // --- 1. Build Query and Parameters (same as before) ---
+    // ... (Query building logic remains the same) ...
+	dbMapping := map[string]string{
+		"content_interest":          "content_interest",
+		"audience_age":              "audience_age",
+		"audience_location":         "audience_location",
+		"audience_gender":           "audience_gender",
+		"kol_growth":                "kol_growth",
+		"tiktokshop_updated_at":     "tiktokshop_updated_at",
+		"tiktokshop_creator_status": "tiktokshop_creator_status",
+	}
+
+	var setClauses []string
+	var params []interface{}
+	placeholderIdx := 1
+
+	for dataKey, dbCol := range dbMapping {
+		value, ok := identityData[dataKey]
+		if !ok || value == nil {
+			continue
+		}
+
+		var paramValue interface{}
+		// JSON marshal complex types (map or slice)
+		if _, isMap := value.(map[string]interface{}); isMap {
+			jsonValue, err := json.Marshal(value)
+			if err != nil {
+				log.Printf("Warning: Failed to marshal key %s to JSON: %v. Skipping.", dataKey, err)
+				continue
+			}
+			paramValue = jsonValue
+		} else if _, isSlice := value.([]interface{}); isSlice {
+			jsonValue, err := json.Marshal(value)
+			if err != nil {
+				log.Printf("Warning: Failed to marshal key %s to JSON: %v. Skipping.", dataKey, err)
+				continue
+			}
+			paramValue = jsonValue
+		} else {
+			paramValue = value
+		}
+
+		params = append(params, paramValue)
+		setClauses = append(setClauses, fmt.Sprintf("%s = $%d", dbCol, placeholderIdx))
+		placeholderIdx++
+	}
+
+	if len(setClauses) == 0 {
+		return nil
+	}
+
+	// Append updated_at and WHERE clause parameter (user_id)
+	setClauses = append(setClauses, fmt.Sprintf("updated_at = $%d", placeholderIdx))
+	params = append(params, time.Now())
+	placeholderIdx++
+
+	updateQuery := fmt.Sprintf(`
+        UPDATE crawler.social_profiles
+        SET %s
+        WHERE id = $%d;`, strings.Join(setClauses, ", "), placeholderIdx)
+	params = append(params, userID)
+	log.Printf("Executing update query for user %d.", userID)
+
+	// --- 2. Implement Retry Logic ---
+	const maxRetries = 3
+	var lastErr error
+	
+	for i := 0; i < maxRetries; i++ {
+		// Use db.Exec instead of a manual transaction
+		_, err := sp.db.ExecContext(ctx, updateQuery, params...)
+		
+		if err == nil {
+			return nil // Success!
+		}
+		
+		lastErr = err
+		
+        // Check for transient network/connection errors (e.g., connection reset by peer)
+        // Note: The specific error check can be tricky, but checking for 'i/o timeout' 
+        // or a string match for the 'reset by peer' is a common, though fragile, approach.
+        // A simple exponential backoff is the most robust general defense.
+		log.Printf("Update failed (Attempt %d/%d): %v. Retrying in %d seconds...", 
+			i+1, maxRetries, err, 1<<i)
+
+		// Exponential Backoff: 1s, 2s, 4s...
+		time.Sleep(time.Duration(1<<i) * time.Second)
+	}
+
+	return fmt.Errorf("failed to update TTO user %d after %d retries: %w", userID, maxRetries, lastErr)
 }
 
 func (sp *socialProfileRepository) GetSocialProfileCrawlTTO() ([]models.SocialProfile, error) {
