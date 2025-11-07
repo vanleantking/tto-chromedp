@@ -43,9 +43,9 @@ func InitDB(creds DBCredentials) (*sql.DB, error) {
 	}
 
 	// Set connection pool parameters (recommended for production)
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
-	db.SetConnMaxLifetime(10 * time.Minute)
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(20 * time.Minute)
 
 	log.Println("Successfully connected to PostgreSQL database!")
 	return db, nil
