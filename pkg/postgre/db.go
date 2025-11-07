@@ -42,11 +42,6 @@ func InitDB(creds DBCredentials) (*sql.DB, error) {
 		return nil, fmt.Errorf("error connecting to database (ping failed): %w", err)
 	}
 
-	// Set connection pool parameters (recommended for production)
-	db.SetMaxOpenConns(5)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(20 * time.Minute)
-
 	log.Println("Successfully connected to PostgreSQL database!")
 	return db, nil
 }
