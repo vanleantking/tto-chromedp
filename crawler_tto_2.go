@@ -604,7 +604,7 @@ func main() {
 
 // initChromedpOptions sets up the allocator options with anti-detection flags and user data.
 func initChromedpOptions(profileName string, headless bool, userAgent string) []chromedp.ExecAllocatorOption {
-	profilePath := filepath.Join("./profiles", profileName)
+	profilePath := filepath.Join(".", "profiles", profileName)
 	fmt.Println("profilePath---------, ", profilePath)
 
 	opts := append(
@@ -615,9 +615,6 @@ func initChromedpOptions(profileName string, headless bool, userAgent string) []
 		// chromedp.Flag("no-default-browser-check", true),
 		// chromedp.Flag("disable-extensions", false),
 		chromedp.Flag("disable-blink-features", "AutomationControlled"),
-		// Standard flags for clean background operation
-		// chromedp.DisableGPU,
-		chromedp.NoSandbox,
 	)
 	return opts
 }
