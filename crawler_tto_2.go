@@ -350,7 +350,7 @@ func processSingleKol(
 	select {
 	case newTargetID = <-targetCh:
 		log.Printf("SUCCESS: Captured new target ID: %s", newTargetID)
-	case <-time.After(15 * time.Second):
+	case <-time.After(30 * time.Second):
 		return kolName, nil, fmt.Errorf("timed out waiting for new tab target event")
 	}
 
@@ -403,6 +403,7 @@ func processSingleKol(
 		chromedp.EmulateViewport(1920, 1080),
 		// Wait for the page content to fully load
 		chromedp.WaitVisible("body", chromedp.ByQuery),
+		// chromedp.WaitReady("body", chromedp.ByQuery), // Wait for DOM content to be loaded
 		chromedp.Sleep(5*time.Second), // Wait for async data load (Playwright's 100000ms equivalent, but reduced)
 		// Refresh the page as requested
 		chromedp.ActionFunc(func(ctx context.Context) error {
@@ -410,7 +411,7 @@ func processSingleKol(
 			return nil
 		}),
 		chromedp.Reload(),
-		chromedp.Sleep(5*time.Second), // Wait again after refresh
+		chromedp.Sleep(15*time.Second), // Wait again after refresh
 	); err != nil {
 		return kolName, nil, fmt.Errorf("failed to load/process new tab: %w", err)
 	}
