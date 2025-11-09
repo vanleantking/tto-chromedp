@@ -532,12 +532,6 @@ func main() {
 	}
 
 	socialProfileRepo := postgre.NewSocialProfileRepository(postgreDB)
-	kolsToCrawl, err := socialProfileRepo.GetSocialProfileCrawlTTO()
-	if err != nil {
-		log.Fatalf("Failed to get KOLs to crawl from PostgreSQL: %v", err)
-	}
-
-	fmt.Println(countryIsoCode, kolsToCrawl)
 
 	// loginURL := PARTNER_TIKTOKSHOP_LOGIN_URL
 	// username := "van.le@brancherx.com" // Placeholder
@@ -547,52 +541,65 @@ func main() {
 	userAgent := DEFAULT_USER_AGENT
 	profileName := "tto"
 
-	// 2. Start the main crawling loop using the saved state.
-	log.Println("\n--- Starting KOL Crawling Process ---")
-
-	for _, kol := range kolsToCrawl {
-
-		crawledData, err := crawlerKols(kol, urlPattern, statePath, userAgent, profileName, false)
-
+	for {
+		kolsToCrawl, err := socialProfileRepo.GetSocialProfileCrawlTTO()
 		if err != nil {
-			log.Println("Fatal: Crawler failed: %v", err)
-			log.Printf("Incomplete data collected for KOL %s.", kol.UserName)
-			err = socialProfileRepo.UpdateTTOUser2(context.Background(), kol.ID, map[string]interface{}{
-				"tiktokshop_updated_at":     time.Now(),
-				"tiktokshop_creator_status": -2,
-			})
-			if err != nil {
-				log.Printf("Error updating creator status for KOL ID %d: %v", kol.ID, err)
-			}
-			continue
+			log.Fatalf("Failed to get KOLs to crawl from PostgreSQL: %v", err)
 		}
-		log.Printf("Successfully crawled creator: ID=%s, Username=%s", kol.UserName, len(crawledData))
-		userInfo, isFull := parseUserData(crawledData, countryIsoCode, socialProfileRepo)
-		if isFull {
-			log.Printf("Full data collected for KOL %s.", kol.UserName)
-			log.Printf("User Info: %+v", *userInfo)
 
-			// Convert TTOUser struct to map[string]interface{} to match the repository method signature.
-			// This is a common pattern using JSON marshaling/unmarshaling.
-			var dataToUpdate map[string]interface{}
-			jsonData, err := json.Marshal(userInfo)
+		if len(kolsToCrawl) == 0 {
+			break
+		}
+
+		fmt.Println(countryIsoCode, kolsToCrawl)
+
+		// 2. Start the main crawling loop using the saved state.
+		log.Println("\n--- Starting KOL Crawling Process ---")
+
+		for _, kol := range kolsToCrawl {
+
+			crawledData, err := crawlerKols(kol, urlPattern, statePath, userAgent, profileName, false)
+
 			if err != nil {
-				log.Printf("Error marshaling user info to JSON for KOL ID %d: %v", kol.ID, err)
+				log.Println("Fatal: Crawler failed: %v", err)
+				log.Printf("Incomplete data collected for KOL %s.", kol.UserName)
+				err = socialProfileRepo.UpdateTTOUser2(context.Background(), kol.ID, map[string]interface{}{
+					"tiktokshop_updated_at":     time.Now(),
+					"tiktokshop_creator_status": -2,
+				})
+				if err != nil {
+					log.Printf("Error updating creator status for KOL ID %d: %v", kol.ID, err)
+				}
 				continue
 			}
-			if err := json.Unmarshal(jsonData, &dataToUpdate); err != nil {
-				log.Printf("Error unmarshaling user info to map for KOL ID %d: %v", kol.ID, err)
-				continue
-			}
+			log.Printf("Successfully crawled creator: ID=%s, Username=%s", kol.UserName, len(crawledData))
+			userInfo, isFull := parseUserData(crawledData, countryIsoCode, socialProfileRepo)
+			if isFull {
+				log.Printf("Full data collected for KOL %s.", kol.UserName)
+				log.Printf("User Info: %+v", *userInfo)
 
-			fmt.Println("dataToUpdate------------, ", dataToUpdate)
-			dataToUpdate["tiktokshop_updated_at"] = time.Now()
-			dataToUpdate["tiktokshop_creator_status"] = 1
+				// Convert TTOUser struct to map[string]interface{} to match the repository method signature.
+				// This is a common pattern using JSON marshaling/unmarshaling.
+				var dataToUpdate map[string]interface{}
+				jsonData, err := json.Marshal(userInfo)
+				if err != nil {
+					log.Printf("Error marshaling user info to JSON for KOL ID %d: %v", kol.ID, err)
+					continue
+				}
+				if err := json.Unmarshal(jsonData, &dataToUpdate); err != nil {
+					log.Printf("Error unmarshaling user info to map for KOL ID %d: %v", kol.ID, err)
+					continue
+				}
 
-			// Update the database with the collected data
-			err = socialProfileRepo.UpdateTTOUser2(context.Background(), kol.ID, dataToUpdate)
-			if err != nil {
-				log.Printf("Error updating TTO user for KOL ID %d: %v", kol.ID, err)
+				fmt.Println("dataToUpdate------------, ", dataToUpdate)
+				dataToUpdate["tiktokshop_updated_at"] = time.Now()
+				dataToUpdate["tiktokshop_creator_status"] = 1
+
+				// Update the database with the collected data
+				err = socialProfileRepo.UpdateTTOUser2(context.Background(), kol.ID, dataToUpdate)
+				if err != nil {
+					log.Printf("Error updating TTO user for KOL ID %d: %v", kol.ID, err)
+				}
 			}
 		}
 	}

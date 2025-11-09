@@ -389,7 +389,7 @@ func (sp *socialProfileRepository) UpdateTTOUser2(ctx context.Context, userID in
 
 func (sp *socialProfileRepository) GetSocialProfileCrawlTTO() ([]models.SocialProfile, error) {
 	sqlQuery := `SELECT id, username FROM crawler.social_profiles WHERE tiktokshop_creator_status = $1 LIMIT $2;`
-	rows, err := sp.db.QueryContext(context.Background(), sqlQuery, -1, 10)
+	rows, err := sp.db.QueryContext(context.Background(), sqlQuery, -1, 100)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query social profiles: %w", err)
 	}
