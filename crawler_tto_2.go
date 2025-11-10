@@ -404,14 +404,14 @@ func processSingleKol(
 		// Wait for the page content to fully load
 		chromedp.WaitVisible("body", chromedp.ByQuery),
 		// chromedp.WaitReady("body", chromedp.ByQuery), // Wait for DOM content to be loaded
-		chromedp.Sleep(30*time.Second), // Wait for async data load (Playwright's 100000ms equivalent, but reduced)
+		chromedp.Sleep(45*time.Second), // Wait for async data load (Playwright's 100000ms equivalent, but reduced)
 		// Refresh the page as requested
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			log.Println("Refreshing the page...")
 			return nil
 		}),
 		chromedp.Reload(),
-		chromedp.Sleep(5*time.Second), // Wait again after refresh
+		chromedp.Sleep(15*time.Second), // Wait again after refresh
 	); err != nil {
 		return kolName, nil, fmt.Errorf("failed to load/process new tab: %w", err)
 	}
