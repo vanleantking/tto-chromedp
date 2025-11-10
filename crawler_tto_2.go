@@ -602,6 +602,7 @@ func main() {
 					log.Printf("Error updating TTO user for KOL ID %d: %v", kol.ID, err)
 				}
 			}
+			time.Sleep(60 * time.Second)
 		}
 	}
 
