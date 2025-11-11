@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -318,8 +319,9 @@ func processSingleKol(
 	}
 
 	if strings.Contains(firstCardContent, NO_RESULTS_TEXT) || strings.TrimSpace(creatorNameText) != kolName {
-		log.Printf("No results found or name mismatch: Expected '%s', Found '%s'", kolName, creatorNameText)
-		return kolName, collectedData, nil
+		msg := fmt.Sprintf("No results found or name mismatch: Expected '%s', Found '%s'", kolName, creatorNameText)
+		log.Printf(msg)
+		return kolName, collectedData, errors.New(msg)
 	}
 	log.Printf("Found matching creator: %s. Proceeding to click.", creatorNameText)
 
