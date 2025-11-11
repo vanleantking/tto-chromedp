@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os" // Required for profile path handling
@@ -201,6 +202,10 @@ func main() {
 	// password := "VLantking2013!"       // Placeholder
 	// statePath := "tiktokshop_state_go.json"
 	userAgent := DEFAULT_USER_AGENT
+	var paramValue bool
+	flag.BoolVar(&paramValue, "enable-unsafe", false, "A boolean parameter to enable a feature")
+	flag.StringVar(&userAgent, "user-agent", DEFAULT_USER_AGENT, "A boolean parameter to enable a feature")
+	flag.Parse()
 
 	// err := simulateLogin(
 	// 	loginURL,
@@ -222,8 +227,8 @@ func main() {
 		ttoHomepage,
 		userAgent,
 		"tto",
-		false, // headless
-		"",    // proxy
+		false,      // headless
+		paramValue, // proxy
 	); err != nil {
 		log.Fatalf("Login and state saving failed: %v", err)
 	}
@@ -281,9 +286,9 @@ func visitHomePage(
 	userAgent string,
 	profileName string, // Added profileName to function signature
 	headless bool,
-	proxy string, // Note: Proxy configuration is more complex in chromedp and often requires external tools or specific transport settings.
+	enableUnsafe bool,
 ) error {
-	opts := initChromedpOptions(profileName, headless, userAgent)
+	opts := initChromedpOptions(profileName, headless, userAgent, enableUnsafe)
 
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancel()
@@ -341,7 +346,7 @@ func visitHomePage(
 }
 
 // initChromedpOptions sets up the allocator options with anti-detection flags and user data.
-func initChromedpOptions(profileName string, headless bool, userAgent string) []chromedp.ExecAllocatorOption {
+func initChromedpOptions(profileName string, headless bool, userAgent string, enableUnsafe bool) []chromedp.ExecAllocatorOption {
 	profilePath := filepath.Join(".", "profiles", profileName)
 	fmt.Println("profilePath---------, ", profilePath)
 
@@ -359,5 +364,9 @@ func initChromedpOptions(profileName string, headless bool, userAgent string) []
 		// chromedp.Flag("no-first-run", true),
 		chromedp.Flag("no-default-browser-check", true),
 	)
+
+	if enableUnsafe {
+		opts = append(opts, chromedp.Flag("enable-unsafe-swiftshader", true))
+	}
 	return opts
 }

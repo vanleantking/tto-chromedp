@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -436,10 +437,11 @@ func crawlerKols(
 	userAgent string,
 	profileName string,
 	headless bool,
+	enableUnsafe bool,
 ) ([]CollectedData, error) {
 
 	// 1. Initial Setup: Allocator Context (Browser Instance)
-	opts := initChromedpOptions(profileName, headless, userAgent)
+	opts := initChromedpOptions(profileName, headless, userAgent, enableUnsafe)
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancelAlloc()
 
@@ -504,6 +506,12 @@ func main() {
 		log.Printf("Warning: Could not load .env file: %v", err)
 	}
 
+	userAgent := DEFAULT_USER_AGENT
+	var paramValue bool
+	flag.BoolVar(&paramValue, "enable-unsafe", false, "A boolean parameter to enable a feature")
+	flag.StringVar(&userAgent, "user-agent", DEFAULT_USER_AGENT, "A boolean parameter to enable a feature")
+	flag.Parse()
+
 	// 1. Configuration parameters
 	reportMongoDB, err := mongodb.ConnectMongoDB(os.Getenv("MONGODB_URI"))
 	if err != nil {
@@ -539,7 +547,7 @@ func main() {
 	// password := "VLantking2013!"       // Placeholder
 	statePath := "tiktokshop_state_go.json"
 	urlPattern := "CreativeOne/MatchPack/MGetCreatorsCard" // Replace with the actual API endpoint pattern
-	userAgent := DEFAULT_USER_AGENT
+
 	profileName := "tto"
 
 	for {
@@ -559,7 +567,7 @@ func main() {
 
 		for _, kol := range kolsToCrawl {
 
-			crawledData, err := crawlerKols(kol, urlPattern, statePath, userAgent, profileName, false)
+			crawledData, err := crawlerKols(kol, urlPattern, statePath, userAgent, profileName, false, paramValue)
 
 			if err != nil {
 				log.Println("Fatal: Crawler failed: %v", err)
@@ -612,7 +620,7 @@ func main() {
 }
 
 // initChromedpOptions sets up the allocator options with anti-detection flags and user data.
-func initChromedpOptions(profileName string, headless bool, userAgent string) []chromedp.ExecAllocatorOption {
+func initChromedpOptions(profileName string, headless bool, userAgent string, enableUnsafe bool) []chromedp.ExecAllocatorOption {
 	profilePath := filepath.Join(".", "profiles", profileName)
 	fmt.Println("profilePath---------, ", profilePath)
 
@@ -629,7 +637,12 @@ func initChromedpOptions(profileName string, headless bool, userAgent string) []
 		chromedp.Flag("enable-automation", false),
 		// chromedp.Flag("no-first-run", true),
 		chromedp.Flag("no-default-browser-check", true),
+		chromedp.UserAgent(userAgent),
 	)
+
+	if enableUnsafe {
+		opts = append(opts, chromedp.Flag("enable-unsafe-swiftshader", true))
+	}
 	return opts
 }
 
