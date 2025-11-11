@@ -619,11 +619,16 @@ func initChromedpOptions(profileName string, headless bool, userAgent string) []
 	opts := append(
 		chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.UserDataDir(profilePath),
+		chromedp.DisableGPU, // Eliminates the viz_main_impl.cc errors
+		chromedp.NoSandbox,  // Essential for many Linux environments
+		chromedp.Flag("disable-extensions", true),
+		chromedp.Flag("disable-background-networking", true),
+		chromedp.Flag("enable-features", "NetworkServiceInProcess"), // Often helps stabilize network stack
 		chromedp.Flag("headless", false),
+		chromedp.Flag("disable-blink-features", "AutomationControlled"),
+		chromedp.Flag("enable-automation", false),
 		// chromedp.Flag("no-first-run", true),
 		// chromedp.Flag("no-default-browser-check", true),
-		// chromedp.Flag("disable-extensions", false),
-		chromedp.Flag("disable-blink-features", "AutomationControlled"),
 	)
 	return opts
 }
