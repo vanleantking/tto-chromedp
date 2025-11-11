@@ -643,6 +643,7 @@ func initChromedpOptions(profileName string, headless bool, userAgent string, en
 	if enableUnsafe {
 		opts = append(opts, chromedp.Flag("enable-unsafe-swiftshader", true))
 	}
+	fmt.Println("opt------------------------,", opts)
 	return opts
 }
 
