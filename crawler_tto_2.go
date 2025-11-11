@@ -448,7 +448,11 @@ func crawlerKols(
 	defer cancelAlloc()
 
 	// 3. Create Main Context (Tab) and Set Emulation
-	mainTaskCtx, cancelMainTask := chromedp.NewContext(allocCtx)
+	mainTaskCtx, cancelMainTask := chromedp.NewContext(allocCtx,
+		chromedp.WithLogf(log.Printf),   // General logging
+		chromedp.WithDebugf(log.Printf), // **Enables CDP communication logging**
+		chromedp.WithErrorf(log.Printf), // Error logging)
+	)
 	defer cancelMainTask()
 
 	if err := chromedp.Run(mainTaskCtx,

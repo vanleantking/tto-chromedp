@@ -294,7 +294,11 @@ func visitHomePage(
 	defer cancel()
 
 	// Create browser context with a timeout for the entire login process
-	taskCtx, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
+	taskCtx, cancel := chromedp.NewContext(allocCtx,
+		chromedp.WithLogf(log.Printf),   // General logging
+		chromedp.WithDebugf(log.Printf), // **Enables CDP communication logging**
+		chromedp.WithErrorf(log.Printf), // Error logging
+	)
 	defer cancel()
 
 	// Apply context settings for realism (locale, timezone, viewport)
