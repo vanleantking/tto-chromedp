@@ -640,6 +640,9 @@ func initChromedpOptions(profileName string, headless bool, userAgent string, en
 		// chromedp.Flag("no-first-run", true),
 		chromedp.Flag("no-default-browser-check", true),
 		chromedp.UserAgent(userAgent),
+		// 1. Enable logging and set verbosity level (max is 9)
+		chromedp.Flag("enable-logging", true),
+		chromedp.Flag("v", "9"),
 	)
 
 	if enableUnsafe {
